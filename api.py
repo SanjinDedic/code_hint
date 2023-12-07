@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from pydantic import validator, Field
@@ -9,6 +10,14 @@ import json
 
 app = FastAPI()
 load_dotenv()  # Load the .env file
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 class CodeHintResponse(BaseModel):
     error_free: bool
