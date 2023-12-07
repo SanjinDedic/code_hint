@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -104,6 +104,16 @@ async def root():
 async def get_code_hints(code_request: CodeRequest):
     try:
         return process_code_snippet(code_request.code)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/get_code_hints_form")
+async def get_code_hints(request: Request):
+    form_data = await request.form()
+    code_snippet = form_data.get("code")
+
+    try:
+        return process_code_snippet(code_snippet)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
