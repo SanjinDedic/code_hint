@@ -86,6 +86,11 @@ def process_code_snippet(code_snippet: str):
     # Return the JSON representation
     return hint_response.json(by_alias=True)
 
+@app.get("/")
+async def root():
+    return {"message": "Hello World I am the code hint api"}
+
+
 @app.post("/get_code_hints")
 async def get_code_hints(code_request: CodeRequest):
     try:
