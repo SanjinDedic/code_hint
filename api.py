@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, StrictStr, StrictInt, Field, field_validator, ValidationError, StrictBool
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic_core.core_schema import ValidationInfo
 from typing import Optional
 from dotenv import load_dotenv
 import uvicorn
@@ -51,12 +51,13 @@ class CodeHintResponse(BaseModel):
     logical_error: StrictBool = Field(False, description="True if the code runs but fails to achieve its intended purpose")
     logical_error_hint: StrictStr = Field("", max_length=200, description="Explanation of the logical error, if any")
 
+
+    # @model_validator with mode ='before' and mode = 'after' is the new way to do this
     @field_validator('runtime_error_line')
-    def validate_runtime_error_line(cls, er_line, info: FieldValidationInfo):
-        if len(info.data) == 0:
+    def validate_runtime_error_line(cls, er_line, info: ValidationInfo):
+        if 'runtime_error_free' not in info.data:
             return
         #view the information contained FieldValidationInfo
-        print("info.data", info.data)
         runtime_error_free = info.data['runtime_error_free']
         if runtime_error_free and er_line != None:
             raise ValueError("CONTRADICTION runtime_error_line must be None if runtime_error_free is True")
@@ -64,20 +65,43 @@ class CodeHintResponse(BaseModel):
             raise ValueError("runtime_error_line must be an integer > 0 if runtime_error_free is False")
         return er_line
     
+
+    @field_validator('runtime_error_free')
+    def validate_error_free(cls, error_free, info: ValidationInfo):
+        print("info.data", info.data, "we are looking for is_python")
+        if len(info.data) == 0:
+            return
+        is_python = info.data['is_python']
+        if is_python == False and error_free == True:
+            raise ValueError("CONTRADICTION runtime_error_free must be False if is_python is False")
+        return error_free
+    
+    @field_validator('logical_error_hint')
+    def validate_logical_error_hint(cls, logical_error_hint, info: ValidationInfo):
+        if len(info.data) == 0 or 'logical_error' not in info.data:
+            return
+        logical_error = info.data['logical_error']
+        if logical_error and logical_error_hint == "":
+            raise ValueError("logical_error_hint must not be empty if logical_error is True")
+        return logical_error_hint
     
 class CodeRequest(BaseModel):
     code: str
 
-def get_code_hints_from_openai(code: str):
+def get_code_hints_from_openai(code: str, attempt=1):
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
+
+    # Adjust temperature based on the attempt
+    temperature = 0 if attempt == 1 else 0.8
+
     data = {
         "model": "gpt-4-1106-preview",
-        "temperature": 0,
-        "max_tokens": 150,  # Increased to accommodate additional information
+        "temperature": temperature,
+        "max_tokens": 150,
         "messages": [
             {
                 "role": "system",
@@ -92,63 +116,43 @@ def get_code_hints_from_openai(code: str):
             "type": "json_object"
         }
     }
+
     response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-    print("response.json()", response.json())
     return response.json()
 
 def process_code_snippet(code_snippet: str):
-    #if the code snippet has more than 80 lines return an error
     if len(code_snippet.split("\n")) > 80:
         return {"error": "Code snippet has more than 80 lines"}
-    openai_response = get_code_hints_from_openai(code_snippet)
-    messages = openai_response.get("choices", [])
-    
-    # Find the assistant's reply message containing the JSON object
-    json_reply = next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
-    # Extract the JSON content from the reply
-    if json_reply and json_reply.get("message", {}).get("content"):
-        json_content = json.loads(json_reply["message"]["content"])
-        is_python = is_python_code(code_snippet)
-        runtime_error_free = json_content.get("runtime_error_free", False)
-        runtime_error_line = json_content.get("runtime_error_line", None)
-        small_hint = json_content.get("small_hint", "")
-        big_hint = json_content.get("big_hint", "")
-        content_warning = json_content.get("content_warning", False)
-        logical_error = json_content.get("logical_error", False)
-        logical_error_hint = json_content.get("logical_error_hint", "")
+    #make sure that length of the string is at least 10 characters
+    if len(code_snippet) < 10:
+        return {"error": "Code snippet is too short"}
+    is_python = is_python_code(code_snippet)
+    attempt = 1
+    while attempt <= 3:
+        openai_response = get_code_hints_from_openai(code_snippet, attempt)
+        messages = openai_response.get("choices", [])
+        
+        json_reply = next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
+        if json_reply and json_reply.get("message", {}).get("content"):
+            try:
+                # Try to parse the response into CodeHintResponse
+                # inclue the is_python value in the data
+                data_to_send =  json.loads(json_reply["message"]["content"])
+                data_to_send["is_python"] = is_python
+                data_to_send = json.dumps(data_to_send)
+                hint_response = CodeHintResponse.model_validate_json(data_to_send)
+                # If parsing is successful, return the response
+                return hint_response.model_dump()
+            except ValidationError as e:
+                # If parsing fails, print the error for logging and try again
+                print(f"Attempt {attempt}: ValidationError - {str(e)}")
+                attempt += 1
+        else:
+            # If no valid reply is found, try again
+            attempt += 1
 
-    else:
-        # Fallback values if the parsing fails
-        is_python = False
-        runtime_error_free = True
-        runtime_error_line = None
-        small_hint = "Could not get hint"
-        big_hint = "Could not get hint"
-        content_warning = False
-        logical_error = False
-        logical_error_hint = ""
-
-    if runtime_error_free:
-        runtime_error_line = None
-        small_hint = ""
-        big_hint = ""
-    
-    if logical_error == False:
-        logical_error_hint = ""
-
-    hint_response = CodeHintResponse(
-        is_python=is_python,
-        runtime_error_free=runtime_error_free,
-        runtime_error_line=runtime_error_line,
-        small_hint=small_hint,
-        big_hint=big_hint,
-        content_warning=content_warning,
-        logical_error=logical_error,
-        logical_error_hint=logical_error_hint
-    )
-    print("after hint_response")
-    # Return the JSON representation using model dump
-    return hint_response.model_dump()
+    # If all attempts fail, return an error message
+    return {"error": "Unable to get valid code hints after 3 attempts"}
 
 @app.get("/")
 async def root():
