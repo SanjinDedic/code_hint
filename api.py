@@ -97,6 +97,9 @@ def get_code_hints_from_openai(code: str):
     return response.json()
 
 def process_code_snippet(code_snippet: str):
+    #if the code snippet has more than 80 lines return an error
+    if len(code_snippet.split("\n")) > 80:
+        return {"error": "Code snippet has more than 80 lines"}
     openai_response = get_code_hints_from_openai(code_snippet)
     messages = openai_response.get("choices", [])
     
