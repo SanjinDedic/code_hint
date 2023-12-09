@@ -80,7 +80,7 @@ def get_code_hints_from_openai(code: str):
             },
             {
                 "role": "user",
-                "content": f"Analyze this Python code:\n{code}\nWill this code run without errors? If not, on which line is the first error? Provide a small hint, a big hint, information about content warning, logical error, and a logical error hint."
+                "content": f"Analyze this Python code:\n{code}\n Identify any runtime errors and logical errors (any errors that mean the code does not fulfill its purpose) and provide a JSON response with the following structure: {{\"runtime_error_free\": BOOLEAN (True if the code has no errors at runtime), \"runtime_error_line\": INT (None if runtime_error_free is true), \"small_hint\": STR (puts the student on the right path to fixing the runtime error, maximum of 8 words), \"big_hint\": STR (provides all the information needed to fix the runtime error, up to 30 words), \"content_warning\": BOOLEAN, \"logical_error\": BOOLEAN, \"logical_error_hint\": STR (up to 200 characters)}}"
             }
         ],
         "response_format": {
@@ -108,14 +108,6 @@ def process_code_snippet(code_snippet: str):
         content_warning = json_content.get("content_warning", False)
         logical_error = json_content.get("logical_error", False)
         logical_error_hint = json_content.get("logical_error_hint", "")
-        print("runtime_error_free", runtime_error_free, type(runtime_error_free))
-        print("runtime_error_line", runtime_error_line, type(runtime_error_line))
-        print("small_hint", small_hint , type(small_hint))
-        print("big_hint", big_hint , type(big_hint))
-        print("content_warning", content_warning , type(content_warning))
-        print("logical_error", logical_error , type(logical_error))
-        print("logical_error_hint", logical_error_hint , type(logical_error_hint))
-        print('----------------------------------')
 
     else:
         # Fallback values if the parsing fails
