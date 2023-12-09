@@ -35,10 +35,10 @@ def is_python_code(s):
     words = re.findall(r"\b\w+\b|[+\-*/%=<>!&|^~()\[\]{}]", s)
     # Count the number of keywords and operators
     count = sum(word in python_keywords or word in python_operators for word in words)
-    # Adjusting the threshold to 10% of the total words
-    ratio = count / len(words)
+    # Adjusting the threshold
+    ratio = count / len(words) if words else 0
     
-    return ratio > 0.2
+    return ratio > 0.25
 
 
 class CodeHintResponse(BaseModel):
