@@ -28,12 +28,17 @@ def is_python_code(s):
     # List of Python operators
     python_operators = {"+", "-", "*", "/", "//", "%", "**", "=", "==", "!=", ">", "<", ">=", "<=","[", "]", "{", "}", ":",
                         "and", "or", "not", "is", "is not", "in", "not in", "&", "|", "^", "~", ")", "("}
-    # Tokenize the input string
-    words = re.findall(r"\b\w+\b", s)
+    # Special case for single print statement
+    if s.strip().startswith('print(') and s.strip().endswith(')'):
+        return True
+    # Tokenize the input string, including special characters
+    words = re.findall(r"\b\w+\b|[+\-*/%=<>!&|^~()\[\]{}]", s)
     # Count the number of keywords and operators
     count = sum(word in python_keywords or word in python_operators for word in words)
-    # Check if count is more than 15% of the total words
-    return count >= len(words) * 0.15
+    # Adjusting the threshold to 10% of the total words
+    ratio = count / len(words)
+    
+    return ratio > 0.2
 
 
 class CodeHintResponse(BaseModel):
