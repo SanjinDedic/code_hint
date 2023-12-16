@@ -14,11 +14,9 @@ elif name.lower():
 else:
   print('Your name is in mixed case.')
 """
-
 data = {
   "code": code_snippet
 }
-
 response = client.post("/get_code_hints", json=data)
 
 print(response.json())
