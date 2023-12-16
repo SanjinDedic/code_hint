@@ -1,3 +1,19 @@
 .env
+
+# Ignore Python cache files
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc.so
+
+# Ignore pytest cache files
 .pytest_cache/
+
+# Ignore coverage files
+.coverage
+.coveragec
+htmlcov/
+
+# Ignore pip files
+Pipfile.lock
