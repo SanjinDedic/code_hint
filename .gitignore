@@ -14,6 +14,7 @@ __pycache__/
 .coverage
 .coveragec
 htmlcov/
+api_test.py
 
 # Ignore pip files
 Pipfile.lock
