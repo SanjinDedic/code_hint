@@ -1,14 +1,12 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, StrictStr, StrictInt, Field, field_validator, ValidationError, StrictBool
-from pydantic_core.core_schema import ValidationInfo
-from typing import Optional
 from dotenv import load_dotenv
-import python_test
+from models import CodeHintResponse, CodeRequest
+from utils import is_this_python
+import json
 import uvicorn
 import requests
 import os
-import json
 
 app = FastAPI()
 load_dotenv()  # Load the .env file
@@ -20,53 +18,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-class CodeHintResponse(BaseModel):
-    is_python: StrictBool = Field(False, description="True if the input is Python code")
-    runtime_error_free: StrictBool
-    runtime_error_line: Optional[int] = Field(None, ge=1, description="The line number of the first error")
-    small_hint: StrictStr = Field("", max_length=50, description="A small hint")
-    big_hint: StrictStr = Field("", max_length=200, description="A big hint")
-    content_warning: StrictBool = Field(False, description="True if inappropriate or abusive language is detected")
-    logical_error: StrictBool = Field(False, description="True if the code runs but fails to achieve its intended purpose")
-    logical_error_hint: StrictStr = Field("", max_length=200, description="Explanation of the logical error, if any")
-
-
-    # @model_validator with mode ='before' and mode = 'after' is the new way to do this
-    @field_validator('runtime_error_line')
-    def validate_runtime_error_line(cls, er_line, info: ValidationInfo):
-        if 'runtime_error_free' not in info.data:
-            return
-        #view the information contained FieldValidationInfo
-        runtime_error_free = info.data['runtime_error_free']
-        if runtime_error_free and er_line != None:
-            raise ValueError("CONTRADICTION runtime_error_line must be None if runtime_error_free is True")
-        if runtime_error_free == False and (er_line == None or er_line < 1):
-            raise ValueError("runtime_error_line must be an integer > 0 if runtime_error_free is False")
-        return er_line
-    
-
-    @field_validator('runtime_error_free')
-    def validate_error_free(cls, error_free, info: ValidationInfo):
-        print("info.data", info.data, "we are looking for is_python")
-        if len(info.data) == 0:
-            return
-        is_python = info.data['is_python']
-        if is_python == False and error_free == True:
-            raise ValueError("CONTRADICTION runtime_error_free must be False if is_python is False")
-        return error_free
-    
-    @field_validator('logical_error_hint')
-    def validate_logical_error_hint(cls, logical_error_hint, info: ValidationInfo):
-        if len(info.data) == 0 or 'logical_error' not in info.data:
-            return
-        logical_error = info.data['logical_error']
-        if logical_error and logical_error_hint == "":
-            raise ValueError("logical_error_hint must not be empty if logical_error is True")
-        return logical_error_hint
-    
-class CodeRequest(BaseModel):
-    code: str
 
 def get_code_hints_from_openai(code: str, attempt=1):
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -106,7 +57,7 @@ def process_code_snippet(code_snippet: str):
     #make sure that length of the string is at least 10 characters
     if len(code_snippet) < 10:
         return {"error": "Code snippet is too short"}
-    is_python = python_test.is_python(code_snippet)
+    is_python = is_this_python(code_snippet)
     attempt = 1
     while attempt <= 3:
         openai_response = get_code_hints_from_openai(code_snippet, attempt)
@@ -116,14 +67,13 @@ def process_code_snippet(code_snippet: str):
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
                 # Try to parse the response into CodeHintResponse
-                # inclue the is_python value in the data
+                # include the is_python value in the data
                 data_to_send =  json.loads(json_reply["message"]["content"])
                 data_to_send["is_python"] = is_python
-                data_to_send = json.dumps(data_to_send)
-                hint_response = CodeHintResponse.model_validate_json(data_to_send)
+                hint_response = CodeHintResponse.model_validate(data_to_send)
                 # If parsing is successful, return the response
                 return hint_response.model_dump()
-            except ValidationError as e:
+            except Exception as e:
                 # If parsing fails, print the error for logging and try again
                 print(f"Attempt {attempt}: ValidationError - {str(e)}")
                 attempt += 1

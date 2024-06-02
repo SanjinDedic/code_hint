@@ -18,3 +18,8 @@ api_test.py
 
 # Ignore pip files
 Pipfile.lock
+
+# Project files
+gen_prompt_project.py
+api_test.py
+api_legacy_test.py
