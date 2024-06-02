@@ -1,8 +1,8 @@
+from xml.dom import ValidationErr
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from models import CodeHintResponse, CodeRequest
-from utils import is_this_python
+from models import CodeHintResponse, CodeRequestModel
 import json
 import uvicorn
 import requests
@@ -30,7 +30,7 @@ def get_code_hints_from_openai(code: str, attempt=1):
     temperature = 0 if attempt == 1 else 0.8
 
     data = {
-        "model": "gpt-4-1106-preview",
+        "model": "gpt-4o",
         "temperature": temperature,
         "max_tokens": 150,
         "messages": [
@@ -51,13 +51,13 @@ def get_code_hints_from_openai(code: str, attempt=1):
     response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
     return response.json()
 
-def process_code_snippet(code_snippet: str):
-    if len(code_snippet.split("\n")) > 80:
-        return {"error": "Code snippet has more than 80 lines"}
-    #make sure that length of the string is at least 10 characters
-    if len(code_snippet) < 10:
-        return {"error": "Code snippet is too short"}
-    is_python = is_this_python(code_snippet)
+@app.get("/")
+async def root():
+    return {"message": "Hello World I am the code hint api"}
+
+@app.post("/get_code_hints")
+async def get_code_hints(code_request: CodeRequestModel):
+    code_snippet = code_request.code
     attempt = 1
     while attempt <= 3:
         openai_response = get_code_hints_from_openai(code_snippet, attempt)
@@ -66,34 +66,18 @@ def process_code_snippet(code_snippet: str):
         json_reply = next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
-                # Try to parse the response into CodeHintResponse
-                # include the is_python value in the data
-                data_to_send =  json.loads(json_reply["message"]["content"])
-                data_to_send["is_python"] = is_python
+                data_to_send = json.loads(json_reply["message"]["content"])
+                data_to_send["is_python"] = True
                 hint_response = CodeHintResponse.model_validate(data_to_send)
-                # If parsing is successful, return the response
                 return hint_response.model_dump()
-            except Exception as e:
-                # If parsing fails, print the error for logging and try again
+            except ValidationErr as e:
                 print(f"Attempt {attempt}: ValidationError - {str(e)}")
                 attempt += 1
         else:
-            # If no valid reply is found, try again
             attempt += 1
 
-    # If all attempts fail, return an error message
-    return {"error": "Unable to get valid code hints after 3 attempts"}
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to get valid code hints after 3 attempts")
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World I am the code hint api"}
-
-
-@app.post("/get_code_hints")
-async def get_code_hints(code_request: CodeRequest):
-    return process_code_snippet(code_request.code)
-
-    
 # Run the application
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

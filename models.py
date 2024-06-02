@@ -1,5 +1,6 @@
 from pydantic import BaseModel, StrictStr, StrictInt, Field, validator, ValidationError, StrictBool
 from typing import Optional
+from utils import is_this_python
 
 class CodeHintResponse(BaseModel):
     is_python: StrictBool = Field(False, description="True if the input is Python code")
@@ -13,33 +14,25 @@ class CodeHintResponse(BaseModel):
 
     @validator('runtime_error_line')
     def validate_runtime_error_line(cls, er_line, values):
-        if 'runtime_error_free' not in values:
-            return
-        runtime_error_free = values['runtime_error_free']
+        runtime_error_free = values.get('runtime_error_free')
         if runtime_error_free and er_line is not None:
-            raise ValueError("CONTRADICTION runtime_error_line must be None if runtime_error_free is True")
+            raise ValueError("runtime_error_line must be None if runtime_error_free is True")
         if not runtime_error_free and (er_line is None or er_line < 1):
             raise ValueError("runtime_error_line must be an integer > 0 if runtime_error_free is False")
         return er_line
     
-    @validator('runtime_error_free')
-    def validate_error_free(cls, error_free, values):
-        print("values", values, "we are looking for is_python")
-        if len(values) == 0:
-            return
-        is_python = values['is_python']
-        if not is_python and error_free:
-            raise ValueError("CONTRADICTION runtime_error_free must be False if is_python is False")
-        return error_free
-
     @validator('logical_error_hint')
     def validate_logical_error_hint(cls, logical_error_hint, values):
-        if len(values) == 0 or 'logical_error' not in values:
-            return
-        logical_error = values['logical_error']
-        if logical_error and logical_error_hint == "":
+        logical_error = values.get('logical_error')
+        if logical_error and not logical_error_hint:
             raise ValueError("logical_error_hint must not be empty if logical_error is True")
         return logical_error_hint
 
-class CodeRequest(BaseModel):
-    code: str
+class CodeRequestModel(BaseModel):
+    code: str = Field(..., min_length=10, max_length=80*500, description="The code snippet to be analyzed")
+
+    @validator('code')
+    def validate_code(cls, code):
+        if not is_this_python(code):
+            raise ValueError("The provided code is not valid Python")
+        return code
