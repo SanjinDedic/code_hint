@@ -23,3 +23,8 @@ Pipfile.lock
 gen_prompt_project.py
 api_test.py
 api_legacy_test.py
+
+# Ignore venv files
+venv/
+
+

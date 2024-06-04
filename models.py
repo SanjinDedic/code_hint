@@ -29,7 +29,7 @@ class CodeHintResponse(BaseModel):
         return logical_error_hint
 
 class CodeRequestModel(BaseModel):
-    code: str = Field(..., min_length=10, max_length=80*500, description="The code snippet to be analyzed")
+    code: str = Field(..., min_length=10, max_length=80*50, description="The code snippet to be analyzed")
 
     @validator('code')
     def validate_code(cls, code):
