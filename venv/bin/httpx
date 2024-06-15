@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/home/slowturing/Google Drive/PROJECTS/code_hint/venv/bin/python3" "$0" "$@"
+'''exec' "/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/venv/bin/python3.12" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re

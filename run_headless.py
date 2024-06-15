@@ -2,6 +2,10 @@ import requests
 from fastapi.testclient import TestClient
 from api import app
 
+from database import create_db_and_tables
+
+create_db_and_tables()
+
 client = TestClient(app)
 
 # Code snippets to be analyzed

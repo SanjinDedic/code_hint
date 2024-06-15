@@ -1,12 +1,15 @@
 from xml.dom import ValidationErr
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from models import CodeHintResponse, CodeRequestModel
+from models import CodeHint, CodeSnippet
+from database import create_db_and_tables, get_session
+from utils import is_this_python
 import json
 import uvicorn
 import requests
 import os
+from sqlmodel import Session
 
 app = FastAPI()
 load_dotenv()  # Load the .env file
@@ -56,7 +59,7 @@ async def root():
     return {"message": "Hello World I am the code hint api"}
 
 @app.post("/get_code_hints")
-async def get_code_hints(code_request: CodeRequestModel):
+async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(get_session)):
     code_snippet = code_request.code
     attempt = 1
     while attempt <= 3:
@@ -67,9 +70,28 @@ async def get_code_hints(code_request: CodeRequestModel):
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
                 data_to_send = json.loads(json_reply["message"]["content"])
-                data_to_send["is_python"] = True
-                hint_response = CodeHintResponse.model_validate(data_to_send)
-                return hint_response.model_dump()
+                data_to_send["is_python"] = is_this_python(code_snippet) #need to refine this function
+
+                code_snippet_instance = CodeSnippet(code=code_snippet)
+                session.add(code_snippet_instance)
+                session.commit()
+                session.refresh(code_snippet_instance)
+
+                code_hint_instance = CodeHint(
+                    code_snippet_id=code_snippet_instance.id,
+                    is_python=data_to_send["is_python"],
+                    small_hint=data_to_send["small_hint"],
+                    big_hint=data_to_send["big_hint"],
+                    content_warning=data_to_send["content_warning"],
+                    logical_error=data_to_send["logical_error"],
+                    logical_error_hint=data_to_send["logical_error_hint"],
+                    runtime_error_free=data_to_send["runtime_error_free"],
+                    runtime_error_line=data_to_send["runtime_error_line"]
+                )
+                session.add(code_hint_instance)
+                session.commit()
+                session.refresh(code_hint_instance)
+                return code_hint_instance
             except ValidationErr as e:
                 print(f"Attempt {attempt}: ValidationError - {str(e)}")
                 attempt += 1
@@ -77,6 +99,10 @@ async def get_code_hints(code_request: CodeRequestModel):
             attempt += 1
 
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to get valid code hints after 3 attempts")
+
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
 
 # Run the application
 if __name__ == "__main__":
