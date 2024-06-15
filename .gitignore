@@ -21,6 +21,7 @@ Pipfile.lock
 
 # Project files
 gen_prompt_project.py
+project_code.md
 api_test.py
 api_legacy_test.py
 
