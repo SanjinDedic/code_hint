@@ -27,5 +27,7 @@ api_legacy_test.py
 
 # Ignore venv files
 venv/
+code_hints.db
+
 
 

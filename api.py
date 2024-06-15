@@ -62,6 +62,9 @@ async def root():
 async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(get_session)):
     code_snippet = code_request.code
     attempt = 1
+    if is_this_python(code_snippet) == False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The code provided is not valid Python code")
+
     while attempt <= 3:
         openai_response = get_code_hints_from_openai(code_snippet, attempt)
         messages = openai_response.get("choices", [])
@@ -69,8 +72,8 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
         json_reply = next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
-                data_to_send = json.loads(json_reply["message"]["content"])
-                data_to_send["is_python"] = is_this_python(code_snippet) #need to refine this function
+                hint_data = json.loads(json_reply["message"]["content"])
+                hint_data["is_python"] = is_this_python(code_snippet) #need to refine this function!!!
 
                 code_snippet_instance = CodeSnippet(code=code_snippet)
                 session.add(code_snippet_instance)
@@ -79,14 +82,14 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
 
                 code_hint_instance = CodeHint(
                     code_snippet_id=code_snippet_instance.id,
-                    is_python=data_to_send["is_python"],
-                    small_hint=data_to_send["small_hint"],
-                    big_hint=data_to_send["big_hint"],
-                    content_warning=data_to_send["content_warning"],
-                    logical_error=data_to_send["logical_error"],
-                    logical_error_hint=data_to_send["logical_error_hint"],
-                    runtime_error_free=data_to_send["runtime_error_free"],
-                    runtime_error_line=data_to_send["runtime_error_line"]
+                    is_python=hint_data["is_python"],
+                    small_hint=hint_data["small_hint"],
+                    big_hint=hint_data["big_hint"],
+                    content_warning=hint_data["content_warning"],
+                    logical_error=hint_data["logical_error"],
+                    logical_error_hint=hint_data["logical_error_hint"],
+                    runtime_error_free=hint_data["runtime_error_free"],
+                    runtime_error_line=hint_data["runtime_error_line"]
                 )
                 session.add(code_hint_instance)
                 session.commit()

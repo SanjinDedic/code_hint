@@ -1,7 +1,14 @@
 import re
 import keyword
+import ast
 
 def is_this_python(s):
+    try:
+        ast.parse(s)
+        return True
+    except SyntaxError:
+        pass
+
     # Remove single-line comments
     s = re.sub(r"#.*", "", s)
     # Remove single and double-quoted strings
@@ -25,4 +32,5 @@ def is_this_python(s):
     count = sum(word in python_keywords or word in python_operators for word in words)
     # Adjusting the threshold
     ratio = count / len(words) if words else 0
-    return ratio > 0.3
+    print(ratio)
+    return ratio > 0.35
