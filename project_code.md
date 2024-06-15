@@ -1,21 +1,21 @@
 # Project Sitemap
 
-## /home/slowturing/Google Drive/PROJECTS/code_hint
+## /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint
 
-[api.py](/home/slowturing/Google Drive/PROJECTS/code_hint/api.py)
-### /home/slowturing/Google Drive/PROJECTS/code_hint/api.py
+[api.py](/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/api.py)
+### /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/api.py
 ```
-from fastapi import FastAPI, HTTPException, Request, status
+from xml.dom import ValidationErr
+from fastapi import FastAPI, HTTPException, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, StrictStr, StrictInt, Field, field_validator, ValidationError, StrictBool
-from pydantic_core.core_schema import ValidationInfo
-from typing import Optional
 from dotenv import load_dotenv
-import utils
+from models import CodeHint, CodeSnippet
+from database import create_db_and_tables, get_session
+import json
 import uvicorn
 import requests
 import os
-import json
+from sqlmodel import Session
 
 app = FastAPI()
 load_dotenv()  # Load the .env file
@@ -28,53 +28,6 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-class CodeHintResponse(BaseModel):
-    is_python: StrictBool = Field(False, description="True if the input is Python code")
-    runtime_error_free: StrictBool
-    runtime_error_line: Optional[int] = Field(None, ge=1, description="The line number of the first error")
-    small_hint: StrictStr = Field("", max_length=50, description="A small hint")
-    big_hint: StrictStr = Field("", max_length=200, description="A big hint")
-    content_warning: StrictBool = Field(False, description="True if inappropriate or abusive language is detected")
-    logical_error: StrictBool = Field(False, description="True if the code runs but fails to achieve its intended purpose")
-    logical_error_hint: StrictStr = Field("", max_length=200, description="Explanation of the logical error, if any")
-
-
-    # @model_validator with mode ='before' and mode = 'after' is the new way to do this
-    @field_validator('runtime_error_line')
-    def validate_runtime_error_line(cls, er_line, info: ValidationInfo):
-        if 'runtime_error_free' not in info.data:
-            return
-        #view the information contained FieldValidationInfo
-        runtime_error_free = info.data['runtime_error_free']
-        if runtime_error_free and er_line != None:
-            raise ValueError("CONTRADICTION runtime_error_line must be None if runtime_error_free is True")
-        if runtime_error_free == False and (er_line == None or er_line < 1):
-            raise ValueError("runtime_error_line must be an integer > 0 if runtime_error_free is False")
-        return er_line
-    
-
-    @field_validator('runtime_error_free')
-    def validate_error_free(cls, error_free, info: ValidationInfo):
-        print("info.data", info.data, "we are looking for is_python")
-        if len(info.data) == 0:
-            return
-        is_python = info.data['is_python']
-        if is_python == False and error_free == True:
-            raise ValueError("CONTRADICTION runtime_error_free must be False if is_python is False")
-        return error_free
-    
-    @field_validator('logical_error_hint')
-    def validate_logical_error_hint(cls, logical_error_hint, info: ValidationInfo):
-        if len(info.data) == 0 or 'logical_error' not in info.data:
-            return
-        logical_error = info.data['logical_error']
-        if logical_error and logical_error_hint == "":
-            raise ValueError("logical_error_hint must not be empty if logical_error is True")
-        return logical_error_hint
-    
-class CodeRequest(BaseModel):
-    code: str
-
 def get_code_hints_from_openai(code: str, attempt=1):
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     headers = {
@@ -86,7 +39,7 @@ def get_code_hints_from_openai(code: str, attempt=1):
     temperature = 0 if attempt == 1 else 0.8
 
     data = {
-        "model": "gpt-4-1106-preview",
+        "model": "gpt-4o",
         "temperature": temperature,
         "max_tokens": 150,
         "messages": [
@@ -107,13 +60,13 @@ def get_code_hints_from_openai(code: str, attempt=1):
     response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
     return response.json()
 
-def process_code_snippet(code_snippet: str):
-    if len(code_snippet.split("\n")) > 80:
-        return {"error": "Code snippet has more than 80 lines"}
-    #make sure that length of the string is at least 10 characters
-    if len(code_snippet) < 10:
-        return {"error": "Code snippet is too short"}
-    is_python = utils.is_python(code_snippet)
+@app.get("/")
+async def root():
+    return {"message": "Hello World I am the code hint api"}
+
+@app.post("/get_code_hints")
+async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(get_session)):
+    code_snippet = code_request.code
     attempt = 1
     while attempt <= 3:
         openai_response = get_code_hints_from_openai(code_snippet, attempt)
@@ -122,48 +75,164 @@ def process_code_snippet(code_snippet: str):
         json_reply = next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
-                # Try to parse the response into CodeHintResponse
-                # inclue the is_python value in the data
-                data_to_send =  json.loads(json_reply["message"]["content"])
-                data_to_send["is_python"] = is_python
-                data_to_send = json.dumps(data_to_send)
-                hint_response = CodeHintResponse.model_validate_json(data_to_send)
-                # If parsing is successful, return the response
-                return hint_response.model_dump()
-            except ValidationError as e:
-                # If parsing fails, print the error for logging and try again
+                data_to_send = json.loads(json_reply["message"]["content"])
+                data_to_send["is_python"] = True
+
+                code_snippet_instance = CodeSnippet(code=code_snippet)
+                session.add(code_snippet_instance)
+                session.commit()
+                session.refresh(code_snippet_instance)
+
+                code_hint_instance = CodeHint(
+                    code_snippet_id=code_snippet_instance.id,
+                    small_hint=data_to_send["small_hint"],
+                    big_hint=data_to_send["big_hint"],
+                    content_warning=data_to_send["content_warning"],
+                    logical_error=data_to_send["logical_error"],
+                    logical_error_hint=data_to_send["logical_error_hint"],
+                    runtime_error_free=data_to_send["runtime_error_free"],
+                    runtime_error_line=data_to_send["runtime_error_line"]
+                )
+                session.add(code_hint_instance)
+                session.commit()
+                session.refresh(code_hint_instance)
+                return code_hint_instance
+            except ValidationErr as e:
                 print(f"Attempt {attempt}: ValidationError - {str(e)}")
                 attempt += 1
         else:
-            # If no valid reply is found, try again
             attempt += 1
 
-    # If all attempts fail, return an error message
-    return {"error": "Unable to get valid code hints after 3 attempts"}
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to get valid code hints after 3 attempts")
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World I am the code hint api"}
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
 
-
-@app.post("/get_code_hints")
-async def get_code_hints(code_request: CodeRequest):
-    return process_code_snippet(code_request.code)
-
-    
 # Run the application
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
-## /home/slowturing/Google Drive/PROJECTS/code_hint
+## /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint
 
-[utils.py](/home/slowturing/Google Drive/PROJECTS/code_hint/utils.py)
-### /home/slowturing/Google Drive/PROJECTS/code_hint/utils.py
+[models.py](/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/models.py)
+### /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/models.py
+```
+from sqlmodel import Field, SQLModel, Relationship
+from typing import Optional
+from pydantic import validator
+from utils import is_this_python
+
+class CodeSnippet(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(min_length=10, max_length=80*50, description="The code snippet to be analyzed")
+    hints: Optional["CodeHint"] = Relationship(back_populates="code_snippet")
+
+    @validator('code')
+    def validate_code(cls, code):
+        if not is_this_python(code):
+            raise ValueError("The provided code is not valid Python")
+        return code
+
+class CodeHint(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code_snippet_id: int = Field(foreign_key="codesnippet.id")
+    code_snippet: Optional[CodeSnippet] = Relationship(back_populates="hints")
+    small_hint: str = Field(max_length=50, description="A small hint")
+    big_hint: str = Field(max_length=200, description="A big hint")
+    content_warning: bool = Field(default=False, description="True if inappropriate or abusive language is detected")
+    logical_error: bool = Field(default=False, description="True if the code runs but fails to achieve its intended purpose")
+    logical_error_hint: str = Field(max_length=200, description="Explanation of the logical error, if any")
+    runtime_error_free: bool = Field(default=True, description="True if the code runs without any runtime errors")
+    runtime_error_line: Optional[int] = Field(None, ge=1, description="The line number of the first error")
+
+    @validator('logical_error_hint')
+    def validate_logical_error_hint(cls, logical_error_hint, values):
+        logical_error = values.get('logical_error')
+        if logical_error and not logical_error_hint:
+            raise ValueError("logical_error_hint must not be empty if logical_error is True")
+        return logical_error_hint
+```
+## /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint
+
+[run_headless.py](/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/run_headless.py)
+### /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/run_headless.py
+```
+import requests
+from fastapi.testclient import TestClient
+from api import app
+
+from database import create_db_and_tables
+
+create_db_and_tables()
+
+client = TestClient(app)
+
+# Code snippets to be analyzed
+code_snippets = {
+    1: """
+name = input('Enter your name: ') 
+if name.isupper():
+  print('Your name is in uppercase.')
+elif name.lower():
+  print('Your name is in lowercase.')
+else:
+  print('Your name is in mixed case.')
+""",
+    2: """
+def factorial(n):
+    if n == 1:
+        return 1
+    else:
+        return n * factorial(n)
+""",
+    3: """
+def is_palindrome(s):
+    return s == s[::-1]
+
+print(is_palindrome("racecar"))
+print(is_palindrome("hello"))
+"""
+}
+
+choice = int(input("Enter the number of the code snippet you want to analyze: "))
+
+if choice not in code_snippets:
+    print("Invalid choice. Exiting...")
+    exit()
+
+code_snippet = code_snippets[choice]
+
+data = {
+    "code": code_snippet
+}
+response = client.post("/get_code_hints", json=data)
+
+result = response.json()
+
+print("\nCode Snippet:")
+print("=" * 20)
+print(code_snippet)
+print("=" * 20)
+
+print("\nAnalysis Results:")
+print("=" * 20)
+print(f"Small Hint: {result['small_hint']}")
+print(f"Big Hint: {result['big_hint']}")
+print(f"Logical Error Hint: {result['logical_error_hint']}")
+print("=" * 20)
+
+print(f"| Content Warning: {result['content_warning']}, | Logical Error: {result['logical_error']}, | Runtime Error Free: {result['runtime_error_free']}, | Is Python: {result['is_python']} |")
+```
+## /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint
+
+[utils.py](/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/utils.py)
+### /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/utils.py
 ```
 import re
 import keyword
 
-def is_python(s):
+def is_this_python(s):
     # Remove single-line comments
     s = re.sub(r"#.*", "", s)
     # Remove single and double-quoted strings
@@ -189,32 +258,40 @@ def is_python(s):
     ratio = count / len(words) if words else 0
     return ratio > 0.3
 ```
-## /home/slowturing/Google Drive/PROJECTS/code_hint
+## /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint
 
-[run_headless.py](/home/slowturing/Google Drive/PROJECTS/code_hint/run_headless.py)
-### /home/slowturing/Google Drive/PROJECTS/code_hint/run_headless.py
+[database.py](/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/database.py)
+### /Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/database.py
 ```
-import requests
-from fastapi.testclient import TestClient
-from api import app
+from sqlmodel import create_engine, SQLModel, Session
+from models import CodeSnippet, CodeHint
 
-client = TestClient(app)
 
-# The code snippet to be analyzed
-code_snippet = """
-name = input('Enter your name: ') 
-if name.isupper():
-  print('Your name is in uppercase.')
-elif name.lower():
-  print('Your name is in lowercase.')
-else:
-  print('Your name is in mixed case.')
-"""
-data = {
-  "code": code_snippet
-}
-response = client.post("/get_code_hints", json=data)
+DATABASE_URL = "sqlite:///./code_hints.db"
+engine = create_engine(DATABASE_URL)
 
-print(response.json())
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
 
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+def save_code_snippet_and_hints(code: str, hints: dict):
+    with Session(engine) as session:
+        code_snippet = CodeSnippet(code=code)
+        session.add(code_snippet)
+        session.commit()
+        session.refresh(code_snippet)
+
+        code_hint = CodeHint(
+            code_snippet_id=code_snippet.id,
+            small_hint=hints["small_hint"],
+            big_hint=hints["big_hint"],
+            content_warning=hints["content_warning"],
+            logical_error=hints["logical_error"],
+            logical_error_hint=hints["logical_error_hint"]
+        )
+        session.add(code_hint)
+        session.commit()
 ```
