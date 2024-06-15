@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 from api import app, get_session
 from models import CodeSnippet, CodeHint
 
@@ -17,7 +18,20 @@ def factorial(n):
 """
     }
 
-def test_get_code_hints(test_code_snippet):
+@patch("api.get_code_hints_from_openai")
+def test_get_code_hints(mock_get_code_hints_from_openai, test_code_snippet):
+    mock_response = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"runtime_error_free": true, "runtime_error_line": null, "small_hint": "test small hint", "big_hint": "test big hint", "content_warning": false, "logical_error": false, "logical_error_hint": ""}'
+                }
+            }
+        ]
+    }
+    mock_get_code_hints_from_openai.return_value = mock_response
+
     response = client.post("/get_code_hints", json=test_code_snippet)
     assert response.status_code == 200
     data = response.json()
@@ -30,13 +44,13 @@ def test_get_code_hints(test_code_snippet):
     assert "runtime_error_line" in data
     assert "is_python" in data
 
-def test_get_code_hints_invalid_code():
+@patch("api.is_this_python")
+def test_get_code_hints_invalid_code(mock_is_this_python):
+    mock_is_this_python.return_value = False
     invalid_code_snippet = {"code": """invalid code here? $$"""}
     response = client.post("/get_code_hints", json=invalid_code_snippet)
-    print(response.json())  
     assert response.status_code == 400
     assert response.json() == {"detail": "The code provided is not valid Python code"}
-
 
 def test_root():
     response = client.get("/")

@@ -1,15 +1,25 @@
 from fastapi.testclient import TestClient
 import pytest
-from api import app  # Replace with the actual import of your FastAPI app
-
+from unittest.mock import patch
+from api import app
 
 @pytest.fixture
 def client():
     with TestClient(app) as test_client:
         yield test_client
 
-
-def test_py_1(client):
+@patch("api.get_code_hints_from_openai")
+def test_py_1(mock_get_code_hints_from_openai, client):
+    mock_get_code_hints_from_openai.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"runtime_error_free": true, "runtime_error_line": null, "small_hint": "", "big_hint": "", "content_warning": false, "logical_error": false, "logical_error_hint": ""}'
+                }
+            }
+        ]
+    }
     valid_code = """
     def add_numbers(a, b):
         return a + b
@@ -22,10 +32,18 @@ def test_py_1(client):
     data = response.json()
     assert data['is_python'] is True
 
-
-
-
-def test_valid_code_1(client):
+@patch("api.get_code_hints_from_openai")
+def test_valid_code_1(mock_get_code_hints_from_openai, client):
+    mock_get_code_hints_from_openai.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"runtime_error_free": true, "runtime_error_line": null, "small_hint": "", "big_hint": "", "content_warning": false, "logical_error": false, "logical_error_hint": ""}'
+                }
+            }
+        ]
+    }
     valid_code = """
     def add_numbers(a, b):
         return a + b
@@ -39,7 +57,18 @@ def test_valid_code_1(client):
     assert data['runtime_error_free'] is True
     assert data['runtime_error_line'] is None
 
-def test_valid_code_2(client):
+@patch("api.get_code_hints_from_openai")
+def test_valid_code_2(mock_get_code_hints_from_openai, client):
+    mock_get_code_hints_from_openai.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"runtime_error_free": true, "runtime_error_line": null, "small_hint": "", "big_hint": "", "content_warning": false, "logical_error": false, "logical_error_hint": ""}'
+                }
+            }
+        ]
+    }
     valid_code = """
 class MyClass:
     def __init__(self, name):
@@ -54,7 +83,18 @@ print(obj.name)
     assert data['runtime_error_free'] is True
     assert data['runtime_error_line'] is None
 
-def test_invalid_code_1(client):
+@patch("api.get_code_hints_from_openai")
+def test_invalid_code_1(mock_get_code_hints_from_openai, client):
+    mock_get_code_hints_from_openai.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"runtime_error_free": false, "runtime_error_line": 2, "small_hint": "Fix syntax error", "big_hint": "Add a colon after the for loop condition", "content_warning": false, "logical_error": false, "logical_error_hint": ""}'
+                }
+            }
+        ]
+    }
     invalid_code = """
 for i in range(5)
     print(i)
@@ -64,9 +104,20 @@ for i in range(5)
     data = response.json()
     assert data['runtime_error_free'] is False
     assert isinstance(data['runtime_error_line'], int)
-    assert data['runtime_error_line'] > 0  # Assuming the error line is identified correctly
+    assert data['runtime_error_line'] > 0
 
-def test_invalid_code_2(client):
+@patch("api.get_code_hints_from_openai")
+def test_invalid_code_2(mock_get_code_hints_from_openai, client):
+    mock_get_code_hints_from_openai.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"runtime_error_free": false, "runtime_error_line": 1, "small_hint": "Fix syntax error", "big_hint": "Add parentheses after the function name", "content_warning": false, "logical_error": false, "logical_error_hint": ""}'
+                }
+            }
+        ]
+    }
     invalid_code = """
 def my_function()
     return "Hello, world!"
@@ -76,4 +127,4 @@ def my_function()
     data = response.json()
     assert data['runtime_error_free'] is False
     assert isinstance(data['runtime_error_line'], int)
-    assert data['runtime_error_line'] > 0  # Assuming the error line is identified correctly
+    assert data['runtime_error_line'] > 0
