@@ -70,7 +70,7 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
                 data_to_send = json.loads(json_reply["message"]["content"])
-                data_to_send["is_python"] = is_this_python(code_snippet)
+                data_to_send["is_python"] = is_this_python(code_snippet) #need to refine this function
 
                 code_snippet_instance = CodeSnippet(code=code_snippet)
                 session.add(code_snippet_instance)
@@ -79,6 +79,7 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
 
                 code_hint_instance = CodeHint(
                     code_snippet_id=code_snippet_instance.id,
+                    is_python=data_to_send["is_python"],
                     small_hint=data_to_send["small_hint"],
                     big_hint=data_to_send["big_hint"],
                     content_warning=data_to_send["content_warning"],
