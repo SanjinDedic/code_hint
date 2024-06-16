@@ -160,4 +160,3 @@ def test_get_code_hints_validation_error(mock_get_code_hints_from_openai, test_c
     response = client.post("/get_code_hints", json=test_code_snippet)
     assert response.status_code == 500
     assert response.json() == {"detail": "Unable to get valid code hints after 3 attempts"}
-
