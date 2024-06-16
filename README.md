@@ -11,7 +11,7 @@ The Code Hint API is a FastAPI-based application that does the following:
 
 # Known issues:
 - `is_this_python` function gives no false negatives but it is still not reliable in passing Python code with errors as Python
-- All validation should ideally happen in `models.py` but I am having issues with rejecting responses that have contradictions (see commented out validators). If this cannot be fixed, the likely solution is ditching sqlmodel and using just pydantic + sqlalchemy
+- All validation should ideally happen in `models.py` but testing is mocked and I dont have enough data on actual validator performance.
 - Once validation is sorted endpoints should be refactored for better error handling and neater API response parsing.
 
 
