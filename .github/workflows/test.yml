@@ -22,8 +22,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-asyncio httpx pytest-cov
         pip install -r requirements.txt
+    - name: Create test database
+      run: |
+        python -c "from database import create_db_and_tables; create_db_and_tables()"
     - name: Run tests
       run: pytest
+    - name: Delete test database
+      run: |
+        rm -f code_hints.db
 
   coverage:
     needs: test
@@ -39,8 +45,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-asyncio httpx pytest-cov
         pip install -r requirements.txt
+    - name: Create test database
+      run: |
+        python -c "from database import create_db_and_tables; create_db_and_tables()"
     - name: Generate coverage report
       run: pytest --cov=. --cov-report=xml
+    - name: Delete test database
+      run: |
+        rm -f code_hints.db
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4.0.1
       with:
