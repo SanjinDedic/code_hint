@@ -8,11 +8,13 @@ class CodeSnippet(SQLModel, table=True):
     code: str = Field(min_length=10, max_length=80*50, description="The code snippet to be analyzed")
     hints: Optional["CodeHint"] = Relationship(back_populates="code_snippet")
 
+'''Currently handled manually in the API code
     @validator('code')
     def validate_code(cls, code):
         if not is_this_python(code):
             raise ValueError("The provided code is not valid Python")
         return code
+'''
 
 class CodeHint(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
