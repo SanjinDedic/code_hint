@@ -10,6 +10,17 @@ def client():
     with TestClient(app) as test_client:
         yield test_client
 
+@pytest.fixture
+def test_code_snippet():
+    return {
+        "code": """
+def factorial(n):
+    if n == 1:
+        return 1
+    else:
+        return n * factorial(n-1)
+"""
+    }
 
 @patch("api.get_code_hints_from_openai")
 def test_py_1(mock_get_code_hints_from_openai, client):
@@ -131,3 +142,22 @@ def my_function()
     assert data['runtime_error_free'] is False
     assert isinstance(data['runtime_error_line'], int)
     assert data['runtime_error_line'] > 0
+
+@patch("api.get_code_hints_from_openai")
+def test_get_code_hints_validation_error(mock_get_code_hints_from_openai, test_code_snippet, client):
+    mock_response = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": 'invalid json'
+                }
+            }
+        ]
+    }
+    mock_get_code_hints_from_openai.return_value = mock_response
+
+    response = client.post("/get_code_hints", json=test_code_snippet)
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Unable to get valid code hints after 3 attempts"}
+

@@ -35,3 +35,21 @@ class CodeHint(SQLModel, table=True):
         if logical_error and not logical_error_hint:
             raise ValueError("logical_error_hint must not be empty if logical_error is True")
         return logical_error_hint
+    
+    @validator('big_hint')
+    def validate_big_hint(cls, big_hint, values):
+        runtime_error_free = values.get('runtime_error_free')
+        runtime_error_line = values.get('runtime_error_line')
+        if runtime_error_free and not runtime_error_line:
+            if big_hint:
+                raise ValueError("big_hint must be empty if runtime_error_free is True")
+        return big_hint
+'''
+    @validator('runtime_error_line')
+    def validate_runtime_error_line(cls, runtime_error_line, values):
+        runtime_error_free = values.get('runtime_error_free')
+        if not runtime_error_free:
+            #if runtime error line must be an integer or numeric string greater than or equal to 1
+            if not isinstance(runtime_error_line, int) or runtime_error_line < 1:
+                raise ValueError("runtime_error_line must be an integer greater than or equal to 1")
+'''

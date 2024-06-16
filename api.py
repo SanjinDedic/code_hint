@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from models import CodeHint, CodeSnippet
 from database import create_db_and_tables, get_session, save_code_snippet_and_hints
 from utils import is_this_python
+from pydantic import ValidationError
 import json
 import uvicorn
 import requests
@@ -77,10 +78,16 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
                 hint_data = json.loads(json_reply["message"]["content"])
                 hint_data["is_python"] = is_this_python(code_snippet)
 
+                # Validate the hint_data against the CodeHint model
+                CodeHint(**hint_data)
+
                 save_code_snippet_and_hints(session, code_snippet, hint_data)
                 return hint_data
-            except ValidationErr as e:
-                print(f"Attempt {attempt}: ValidationError - {str(e)}")
+            except (ValidationError, json.JSONDecodeError) as e:
+                print(f"Attempt {attempt}: ValidationError or JSONDecodeError - {str(e)}")
+                attempt += 1
+            except ValueError as e:
+                print(f"Attempt {attempt}: ValueError - {str(e)}")
                 attempt += 1
         else:
             attempt += 1
