@@ -1,0 +1,3 @@
+ignore:
+  - "api_test_validation.py"
+  - "run_headless.py"
