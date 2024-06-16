@@ -1,3 +1,6 @@
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)  [![Tests](https://github.com/SanjinDedic/code_hint/actions/workflows/test.yml/badge.svg)](https://github.com/SanjinDedic/code_hint/actions/workflows/test.yml)  [![codecov](https://codecov.io/gh/SanjinDedic/code_hint/graph/badge.svg?token=PWUU4GJSOD)](https://codecov.io/gh/SanjinDedic/code_hint)
+
+
 # Code Hint API
 
 The Code Hint API is a FastAPI-based application that analyzes Python code snippets and provides hints and error information using the OpenAI API. It allows users to submit code snippets and receive feedback on potential runtime errors, logical errors, and content warnings.
