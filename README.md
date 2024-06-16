@@ -3,7 +3,10 @@
 
 # Code Hint API
 
-The Code Hint API is a FastAPI-based application that analyzes Python code snippets and provides hints and error information using the OpenAI API. It allows users to submit code snippets and receive feedback on potential runtime errors, logical errors, and content warnings.
+The Code Hint API is a FastAPI-based application that does the following:
+- validates user requests for code hints before sending them to OpenAI API by ensuring only valid code is sent
+- validates OpenAI API responses based on avoiding internal contradicitons and content warnings.
+- records all validated requests and responses for research purposes
 
 
 # Known issues:
