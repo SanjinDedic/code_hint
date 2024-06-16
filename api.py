@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from models import CodeHint, CodeSnippet
-from database import create_db_and_tables, get_session
+from database import create_db_and_tables, get_session, save_code_snippet_and_hints
 from utils import is_this_python
 import json
 import uvicorn
@@ -58,11 +58,13 @@ def get_code_hints_from_openai(code: str, attempt=1):
 async def root():
     return {"message": "Hello World I am the code hint api"}
 
+from database import save_code_snippet_and_hints
+
 @app.post("/get_code_hints")
 async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(get_session)):
     code_snippet = code_request.code
     attempt = 1
-    if is_this_python(code_snippet) == False:
+    if not is_this_python(code_snippet):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The code provided is not valid Python code")
 
     while attempt <= 3:
@@ -73,28 +75,10 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
                 hint_data = json.loads(json_reply["message"]["content"])
-                hint_data["is_python"] = is_this_python(code_snippet) #need to refine this function!!!
+                hint_data["is_python"] = is_this_python(code_snippet)
 
-                code_snippet_instance = CodeSnippet(code=code_snippet)
-                session.add(code_snippet_instance)
-                session.commit()
-                session.refresh(code_snippet_instance)
-
-                code_hint_instance = CodeHint(
-                    code_snippet_id=code_snippet_instance.id,
-                    is_python=hint_data["is_python"],
-                    small_hint=hint_data["small_hint"],
-                    big_hint=hint_data["big_hint"],
-                    content_warning=hint_data["content_warning"],
-                    logical_error=hint_data["logical_error"],
-                    logical_error_hint=hint_data["logical_error_hint"],
-                    runtime_error_free=hint_data["runtime_error_free"],
-                    runtime_error_line=hint_data["runtime_error_line"]
-                )
-                session.add(code_hint_instance)
-                session.commit()
-                session.refresh(code_hint_instance)
-                return code_hint_instance
+                save_code_snippet_and_hints(session, code_snippet, hint_data)
+                return hint_data
             except ValidationErr as e:
                 print(f"Attempt {attempt}: ValidationError - {str(e)}")
                 attempt += 1

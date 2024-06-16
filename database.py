@@ -12,20 +12,23 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-def save_code_snippet_and_hints(code: str, hints: dict):
-    with Session(engine) as session:
-        code_snippet = CodeSnippet(code=code)
-        session.add(code_snippet)
-        session.commit()
-        session.refresh(code_snippet)
+        
+def save_code_snippet_and_hints(session, code: str, code_hint: dict):
+    code_snippet = CodeSnippet(code=code)
+    session.add(code_snippet)
+    session.commit()
+    session.refresh(code_snippet)
 
-        code_hint = CodeHint(
-            code_snippet_id=code_snippet.id,
-            small_hint=hints["small_hint"],
-            big_hint=hints["big_hint"],
-            content_warning=hints["content_warning"],
-            logical_error=hints["logical_error"],
-            logical_error_hint=hints["logical_error_hint"]
-        )
-        session.add(code_hint)
-        session.commit()
+    code_hint_instance = CodeHint(
+        code_snippet_id=code_snippet.id,
+        is_python=code_hint["is_python"],
+        small_hint=code_hint["small_hint"],
+        big_hint=code_hint["big_hint"],
+        content_warning=code_hint["content_warning"],
+        logical_error=code_hint["logical_error"],
+        logical_error_hint=code_hint["logical_error_hint"],
+        runtime_error_free=code_hint["runtime_error_free"],
+        runtime_error_line=code_hint["runtime_error_line"]
+    )
+    session.add(code_hint_instance)
+    session.commit()
