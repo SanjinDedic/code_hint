@@ -48,7 +48,8 @@ def test_create_code_hint():
         logical_error=False,
         logical_error_hint="",
         runtime_error_free=True,
-        runtime_error_line=None
+        runtime_error_line=None,
+        attempt=1
     )
     session.add(hint)
     session.commit()
@@ -67,7 +68,8 @@ def test_code_hint_validation():
         logical_error=True,
         logical_error_hint="Logical error hint",
         runtime_error_free=True,
-        runtime_error_line=None
+        runtime_error_line=None,
+        attempt=1
     )
     CodeHint.model_validate(hint)
 
