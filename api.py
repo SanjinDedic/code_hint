@@ -55,6 +55,13 @@ def get_code_hints_from_openai(code: str, attempt=1):
     response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
     return response.json()
 
+def extract_assistant_message(openai_response):
+    messages = openai_response.get("choices", [])
+    return next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
+
+
+
+
 @app.get("/")
 async def root():
     return {"message": "Hello World I am the code hint api"}
@@ -70,9 +77,8 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
 
     while attempt <= 3:
         openai_response = get_code_hints_from_openai(code_snippet, attempt)
-        messages = openai_response.get("choices", [])
-        
-        json_reply = next((msg for msg in messages if msg.get("message", {}).get("role") == "assistant"), None)
+
+        json_reply = extract_assistant_message(openai_response)
         if json_reply and json_reply.get("message", {}).get("content"):
             try:
                 hint_data = json.loads(json_reply["message"]["content"])
@@ -81,7 +87,7 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
                 # Validate the hint_data against the CodeHint model
                 CodeHint(**hint_data)
 
-                save_code_snippet_and_hints(session, code_snippet, hint_data)
+                save_code_snippet_and_hints(session, code_snippet, hint_data, attempt)
                 return hint_data
             except (ValidationError, json.JSONDecodeError) as e:
                 print(f"Attempt {attempt}: ValidationError or JSONDecodeError - {str(e)}")

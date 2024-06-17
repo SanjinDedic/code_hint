@@ -14,7 +14,7 @@ def get_session():
         yield session
 
 
-def save_code_snippet_and_hints(session, code: str, code_hint: dict):
+def save_code_snippet_and_hints(session, code: str, code_hint: dict, attempt: int):
     code_snippet = CodeSnippet(code=code)
     session.add(code_snippet)
     session.commit()
@@ -30,7 +30,8 @@ def save_code_snippet_and_hints(session, code: str, code_hint: dict):
             logical_error=code_hint["logical_error"],
             logical_error_hint=code_hint["logical_error_hint"],
             runtime_error_free=code_hint["runtime_error_free"],
-            runtime_error_line=code_hint["runtime_error_line"]
+            runtime_error_line=code_hint["runtime_error_line"],
+            attempt=attempt
         )
         session.add(code_hint_instance)
         session.commit()

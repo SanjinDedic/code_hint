@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Users/sanjindedic/Library/CloudStorage/GoogleDrive-ozrobotix@gmail.com/My Drive/PROJECTS/x/code_hint/venv"
+set -gx VIRTUAL_ENV "/home/slowturing/Google Drive/PROJECTS/code_hint/venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH

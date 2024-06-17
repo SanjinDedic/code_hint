@@ -21,13 +21,14 @@ class CodeHint(SQLModel, table=True):
     is_python: StrictBool = Field(False, description="True if the input is Python code")
     code_snippet_id: int = Field(foreign_key="codesnippet.id")
     code_snippet: Optional[CodeSnippet] = Relationship(back_populates="hints")
-    small_hint: str = Field(max_length=50, description="A small hint")
-    big_hint: str = Field(max_length=200, description="A big hint")
+    small_hint: str = Field(default="", max_length=50, description="A small hint")
+    big_hint: str = Field(default="", max_length=200, description="A big hint")
     content_warning: StrictBool = Field(default=False, description="True if inappropriate or abusive language is detected")
     logical_error: StrictBool = Field(default=False, description="True if the code runs but fails to achieve its intended purpose")
     logical_error_hint: str = Field(max_length=200, description="Explanation of the logical error, if any")
     runtime_error_free: StrictBool = Field(default=True, description="True if the code runs without any runtime errors")
     runtime_error_line: Optional[int] = Field(None, ge=1, description="The line number of the first error")
+    attempt: int = Field(description="The attempt number")
 
     @validator('logical_error_hint')
     def validate_logical_error_hint(cls, logical_error_hint, values):
