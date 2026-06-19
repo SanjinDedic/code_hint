@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Code Hint Visualizer</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-2: #0ea5e9;
+    --good: #22c55e;
+    --bad: #ef4444;
+    --warn: #f59e0b;
+    --code-bg: #0b1220;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 20px 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .examples { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+  @media (max-width: 520px) { .examples { grid-template-columns: 1fr; } }
+  .example {
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    color: var(--text);
+    transition: border-color .15s, transform .05s;
+  }
+  .example:hover { border-color: var(--accent); }
+  .example:active { transform: translateY(1px); }
+  .example.active { border-color: var(--accent); background: var(--panel-2); }
+  .example .title { font-weight: 600; font-size: 14px; }
+  .example .level { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .example .level.hard { color: var(--warn); }
+  textarea {
+    width: 100%;
+    min-height: 280px;
+    resize: vertical;
+    background: var(--code-bg);
+    color: #e6edf3;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+  button#analyze {
+    background: var(--accent-2);
+    color: #04222e;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 22px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button#analyze:hover { background: var(--accent); }
+  button#analyze:disabled { opacity: .55; cursor: not-allowed; }
+  #status { color: var(--muted); font-size: 13px; }
+  .right .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    min-height: 200px;
+  }
+  .placeholder { color: var(--muted); font-size: 14px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600;
+    padding: 5px 11px; border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .badge.good { background: rgba(34,197,94,.12); color: #4ade80; border-color: rgba(34,197,94,.35); }
+  .badge.bad  { background: rgba(239,68,68,.12); color: #f87171; border-color: rgba(239,68,68,.35); }
+  .badge.neutral { background: rgba(148,163,184,.12); color: var(--muted); border-color: rgba(148,163,184,.3); }
+  .hint { margin-bottom: 14px; }
+  .hint .label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+  .hint .value { font-size: 15px; }
+  .hint.small .value { color: var(--accent); }
+  .hint.big { background: var(--panel-2); border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 6px; }
+  .hint.logic { background: rgba(245,158,11,.08); border-left: 3px solid var(--warn); padding: 10px 12px; border-radius: 6px; }
+  .hint .value.empty { color: var(--muted); font-style: italic; }
+  .errbox { color: #f87171; background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.3); border-radius: 8px; padding: 14px; font-size: 14px; }
+  details { margin-top: 18px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; overflow: auto; font-size: 12px; color: #cbd5e1;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧩 Code Hint Visualizer</h1>
+  <span class="sub">Pick an example or paste Python &rarr; analyze via the Code Hint API</span>
+</header>
+
+<main>
+  <section class="left">
+    <h2>Examples</h2>
+    <div id="examples" class="examples"></div>
+
+    <h2>Code</h2>
+    <textarea id="code" spellcheck="false" placeholder="Paste Python code here, or pick an example above..."></textarea>
+    <div class="actions">
+      <button id="analyze">Analyze</button>
+      <span id="status"></span>
+    </div>
+  </section>
+
+  <section class="right">
+    <h2>Analysis</h2>
+    <div id="results" class="panel">
+      <div class="placeholder">No analysis yet. Choose an example and hit <strong>Analyze</strong>.</div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Same-origin when served from FastAPI (/ui). Falls back to localhost when opened as a file.
+  const API_BASE = location.protocol === "file:" ? "http://localhost:8000" : "";
+
+  // The five snippets from run_headless.py, verbatim.
+  const EXAMPLES = [
+    {
+      id: 1, title: "Name case checker", level: "Easy",
+      code:
+`# This snippet takes a name as input and checks its case (uppercase, lowercase, or mixed case),
+# and prints the corresponding message.
+name = input('Enter your name: ')
+if name.isupper():
+  print('Your name is in uppercase.')
+elif name.lower():
+  print('Your name is in lowercase.')
+else:
+  print('Your name is in mixed case.')
+`
+    },
+    {
+      id: 2, title: "Factorial (recursive)", level: "Easy",
+      code:
+`# This snippet defines a recursive function to calculate the factorial of a given number.
+def factorial(n):
+    if n == 1:
+        return 1
+    else:
+        return n * factorial(n)
+`
+    },
+    {
+      id: 3, title: "Palindrome check", level: "Easy",
+      code:
+`# This snippet defines a function to check if a given string is a palindrome.
+# It compares the string with its reverse and returns True if they are equal.
+def is_palindrome(s):
+    return s == s[::-1]
+
+print(is_palindrome("racecar"))
+print(is_palindrome("hello"))
+`
+    },
+    {
+      id: 4, title: "Max subarray sum (Kadane's)", level: "Rare & hard",
+      code:
+`# This snippet defines a function to find the maximum sum of a subarray within a given array.
+# It uses Kadane's algorithm to efficiently solve the problem.
+def find_max_subarray_sum(arr):
+    max_sum = float('-inf')
+    current_sum = 0
+
+    for num in arr:
+        current_sum = max(num, current_sum + num)
+        max_sum = max(max_sum, current_sum)
+
+    return max_sum
+
+arr = [-2, 1, -3, 4, -1, 2, 1, -5, 4]
+print(find_max_subarray_sum(arr))
+`
+    },
+    {
+      id: 5, title: "Valid parentheses (stack)", level: "Rare & hard",
+      code:
+`# This snippet defines a function to check if a given string of parentheses is valid.
+# It uses a stack to keep track of opening parentheses and checks if they match the closing parentheses.
+def is_valid_parentheses(s):
+    stack = []
+    mapping = {")": "(", "]": "[", "}": "{"}
+
+    for char in s:
+        if char in mapping:
+            if not stack or stack.pop() != mapping[char]:
+                return False
+        else:
+            stack.append(char)
+
+    return not stack
+
+print(is_valid_parentheses("()[]{}"))
+print(is_valid_parentheses("([)]"))
+print(is_valid_parentheses("{[]}"))
+`
+    },
+  ];
+
+  const examplesEl = document.getElementById("examples");
+  const codeEl = document.getElementById("code");
+  const analyzeBtn = document.getElementById("analyze");
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+
+  // Render example cards.
+  EXAMPLES.forEach((ex) => {
+    const card = document.createElement("button");
+    card.className = "example";
+    card.dataset.id = ex.id;
+    const hard = ex.level.toLowerCase().includes("hard");
+    card.innerHTML =
+      `<div class="title">${ex.id}. ${ex.title}</div>` +
+      `<div class="level ${hard ? "hard" : ""}">${ex.level}</div>`;
+    card.addEventListener("click", () => {
+      codeEl.value = ex.code;
+      document.querySelectorAll(".example").forEach((c) => c.classList.remove("active"));
+      card.classList.add("active");
+    });
+    examplesEl.appendChild(card);
+  });
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+  }
+
+  // value === goodWhen -> green, else red.
+  function badge(label, value, goodWhen) {
+    const cls = value === goodWhen ? "good" : "bad";
+    const mark = value === goodWhen ? "✓" : "✗";
+    return `<span class="badge ${cls}">${mark} ${esc(label)}</span>`;
+  }
+
+  function hintBlock(cls, label, value) {
+    const empty = value === undefined || value === null || value === "";
+    const text = empty ? "— none —" : esc(value);
+    return `<div class="hint ${cls}"><div class="label">${esc(label)}</div>` +
+           `<div class="value ${empty ? "empty" : ""}">${text}</div></div>`;
+  }
+
+  function renderResult(r) {
+    const badges =
+      badge("Valid Python", !!r.is_python, true) +
+      badge("Runtime error-free", !!r.runtime_error_free, true) +
+      badge("Logical error", !!r.logical_error, false) +
+      badge("Content warning", !!r.content_warning, false) +
+      (r.runtime_error_line != null
+        ? `<span class="badge neutral">Error line: ${esc(r.runtime_error_line)}</span>` : "");
+
+    let html = `<div class="badges">${badges}</div>`;
+    html += hintBlock("small", "Small hint", r.small_hint);
+    html += hintBlock("big", "Big hint", r.big_hint);
+    html += hintBlock("logic", "Logical error hint", r.logical_error_hint);
+    html += `<details><summary>Raw JSON response</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>`;
+    resultsEl.innerHTML = html;
+  }
+
+  function renderError(msg) {
+    resultsEl.innerHTML = `<div class="errbox">${esc(msg)}</div>`;
+  }
+
+  async function analyze() {
+    const code = codeEl.value.trim();
+    if (!code) { renderError("Nothing to analyze — paste some code or pick an example."); return; }
+
+    analyzeBtn.disabled = true;
+    statusEl.textContent = "Analyzing… (calling OpenAI, can take a few seconds)";
+    resultsEl.innerHTML = `<div class="placeholder">Working…</div>`;
+
+    try {
+      const res = await fetch(`${API_BASE}/get_code_hints`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        renderError(`API error ${res.status}: ${data.detail || res.statusText}`);
+      } else {
+        renderResult(data);
+      }
+    } catch (e) {
+      renderError(
+        `Could not reach the API at ${API_BASE || location.origin}. ` +
+        `Is the server running?  (uvicorn api:app --host 0.0.0.0 --port 8000)\n\n${e}`
+      );
+    } finally {
+      analyzeBtn.disabled = false;
+      statusEl.textContent = "";
+    }
+  }
+
+  analyzeBtn.addEventListener("click", analyze);
+  // Ctrl/Cmd + Enter to analyze.
+  codeEl.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") analyze();
+  });
+
+  // Preselect the first example for convenience.
+  examplesEl.firstChild.click();
+</script>
+</body>
+</html>

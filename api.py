@@ -1,6 +1,7 @@
 from xml.dom import ValidationErr
 from fastapi import FastAPI, HTTPException, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from models import CodeHint, CodeSnippet
 from database import create_db_and_tables, get_session, save_code_snippet_and_hints
@@ -14,6 +15,8 @@ from sqlmodel import Session
 
 app = FastAPI()
 load_dotenv()  # Load the .env file
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,6 +68,10 @@ def extract_assistant_message(openai_response):
 @app.get("/")
 async def root():
     return {"message": "Hello World I am the code hint api"}
+
+@app.get("/ui")
+async def ui():
+    return FileResponse(os.path.join(BASE_DIR, "static", "index.html"))
 
 from database import save_code_snippet_and_hints
 

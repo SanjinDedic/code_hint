@@ -15,6 +15,44 @@ The Code Hint API is a FastAPI-based application that does the following:
 - Once validation is sorted endpoints should be refactored for better error handling and neater API response parsing.
 
 
+## Running Locally
+
+To run the Code Hint API on your own machine:
+
+1. **Clone the repository and enter it:**
+   ```
+   git clone <repository_url>
+   cd code_hint
+   ```
+
+2. **Create and activate a virtual environment:**
+   ```
+   python3 -m venv venv
+   source venv/bin/activate        # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install the dependencies:**
+   ```
+   pip install -r requirements.txt
+   ```
+
+4. **Add your OpenAI API key.** Create a `.env` file in the project root containing:
+   ```
+   OPENAI_API_KEY=<your_api_key>
+   ```
+
+5. **Start the server:**
+   ```
+   uvicorn api:app --host 0.0.0.0 --port 8000
+   ```
+
+6. **Use it** in either of two ways:
+   - **Web interface:** open [http://localhost:8000/ui](http://localhost:8000/ui) in your browser, pick an example or paste your own Python, and click **Analyze**.
+   - **Command line:** run `python run_headless.py` and follow the prompts to analyze one of the built-in snippets.
+
+Interactive API docs are also available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+
 ## Deployment
 
 To deploy the Code Hint API, follow these steps:
@@ -56,11 +94,14 @@ To deploy the Code Hint API, follow these steps:
    ```
    This will start the server and make it accessible at `http://localhost:8000`.
 
+8. **Open the web interface (optional)**: With the server running, open [http://localhost:8000/ui](http://localhost:8000/ui) in your browser to use the **Code Hint Visualizer**. It lets you pick one of the built-in example snippets (the same ones used by `run_headless.py`) or paste your own Python code, then displays the analysis — hints, error flags, and content warnings — as color-coded badges. The interface is a single static HTML page served by the API itself, so there is no extra setup or build step. Because it is served from the same origin as the API, no CORS configuration is needed.
+
 ## API Endpoints
 
 The Code Hint API provides the following endpoints:
 
 - `GET /`: Returns a simple "Hello World" message to confirm that the API is running.
+- `GET /ui`: Serves the Code Hint Visualizer, a single-page web interface for analyzing code snippets in the browser.
 - `POST /get_code_hints`: Accepts a JSON payload containing a code snippet and returns the analysis results, including hints, error information, and content warnings.
 
 ## Project Structure
@@ -72,6 +113,7 @@ The project has the following structure:
 - `database.py`: Contains the database configuration and utility functions for creating tables and saving data.
 - `utils.py`: Provides utility functions for code analysis, such as checking if the code is valid Python.
 - `run_headless.py`: A script for testing the API by submitting code snippets and displaying the analysis results.
+- `static/index.html`: A single-page web interface (HTML/CSS/JavaScript) for analyzing code snippets in the browser, served at `/ui`.
 
 ## Dependencies
 
