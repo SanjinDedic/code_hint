@@ -1,6 +1,6 @@
 from sqlmodel import Field, SQLModel, Relationship
 from typing import Optional
-from pydantic import validator, StrictBool
+from pydantic import field_validator, StrictBool, ValidationInfo
 from utils import is_this_python
 
 class CodeSnippet(SQLModel, table=True):
@@ -30,16 +30,18 @@ class CodeHint(SQLModel, table=True):
     runtime_error_line: Optional[int] = Field(None, ge=1, description="The line number of the first error")
     attempt: int = Field(description="The attempt number")
 
-    @validator('logical_error_hint')
-    def validate_logical_error_hint(cls, logical_error_hint, values):
-        logical_error = values.get('logical_error')
+    @field_validator('logical_error_hint')
+    @classmethod
+    def validate_logical_error_hint(cls, logical_error_hint, info: ValidationInfo):
+        logical_error = info.data.get('logical_error')
         if logical_error and not logical_error_hint:
             raise ValueError("logical_error_hint must not be empty if logical_error is True")
         return logical_error_hint
 
-    @validator('big_hint')
-    def validate_big_hint(cls, big_hint, values):
-        runtime_error_free = values.get('runtime_error_free')
+    @field_validator('big_hint')
+    @classmethod
+    def validate_big_hint(cls, big_hint, info: ValidationInfo):
+        runtime_error_free = info.data.get('runtime_error_free')
         if runtime_error_free and big_hint:
             raise ValueError("big_hint must be empty if runtime_error_free is True")
         return big_hint

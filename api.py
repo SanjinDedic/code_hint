@@ -11,9 +11,17 @@ import json
 import uvicorn
 import requests
 import os
+from contextlib import asynccontextmanager
 from sqlmodel import Session
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 load_dotenv()  # Load the .env file
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -106,10 +114,6 @@ async def get_code_hints(code_request: CodeSnippet, session: Session = Depends(g
             attempt += 1
 
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to get valid code hints after 3 attempts")
-
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
 
 # Run the application
 if __name__ == "__main__":
