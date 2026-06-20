@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Code Hint Visualizer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <style>
   :root {
     --bg: #0f172a;
@@ -18,6 +20,10 @@
     --bad: #ef4444;
     --warn: #f59e0b;
     --code-bg: #0b1220;
+    --editor-font: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --editor-size: 13px;
+    --editor-line: 1.5;
+    --editor-pad: 14px;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -38,8 +44,8 @@
   header .sub { color: var(--muted); font-size: 13px; }
   main {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    grid-template-columns: 3fr 1fr;
+    gap: 24px;
     padding: 20px 24px;
     max-width: 1400px;
     margin: 0 auto;
@@ -52,8 +58,9 @@
     color: var(--muted);
     margin: 0 0 10px;
   }
-  .examples { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
-  @media (max-width: 520px) { .examples { grid-template-columns: 1fr; } }
+
+  /* Examples: single stacked column on the right (1/4 width). */
+  .examples { display: grid; grid-template-columns: 1fr; gap: 10px; }
   .example {
     text-align: left;
     background: var(--panel);
@@ -70,22 +77,57 @@
   .example .title { font-weight: 600; font-size: 14px; }
   .example .level { font-size: 12px; color: var(--muted); margin-top: 3px; }
   .example .level.hard { color: var(--warn); }
-  textarea {
-    width: 100%;
-    min-height: 280px;
-    resize: vertical;
-    background: var(--code-bg);
-    color: #e6edf3;
+
+  /* Highlighted code editor: textarea overlaid on a syntax-highlighted <pre>. */
+  .editor {
+    position: relative;
+    height: 360px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 14px;
-    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 13px;
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+  .editor:focus-within { border-color: var(--accent); }
+  .editor pre, .editor textarea {
+    margin: 0;
+    padding: var(--editor-pad);
+    border: 0;
+    width: 100%;
+    height: 100%;
+    font-family: var(--editor-font);
+    font-size: var(--editor-size);
+    line-height: var(--editor-line);
     tab-size: 4;
     white-space: pre;
     overflow: auto;
   }
-  textarea:focus { outline: none; border-color: var(--accent); }
+  .editor pre {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    pointer-events: none;
+    background: transparent;
+    z-index: 0;
+  }
+  .editor pre code {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    padding: 0;
+    background: transparent;
+    white-space: pre;
+  }
+  .editor textarea {
+    position: relative;
+    z-index: 1;
+    resize: none;
+    background: transparent;
+    color: transparent;
+    caret-color: #e6edf3;
+  }
+  .editor textarea::selection { background: rgba(56,189,248,.25); }
+  .editor textarea:focus { outline: none; }
+
   .actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
   button#analyze {
     background: var(--accent-2);
@@ -100,12 +142,14 @@
   button#analyze:hover { background: var(--accent); }
   button#analyze:disabled { opacity: .55; cursor: not-allowed; }
   #status { color: var(--muted); font-size: 13px; }
-  .right .panel {
+
+  .section-gap { margin-top: 24px; }
+  .panel {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 18px;
-    min-height: 200px;
+    min-height: 160px;
   }
   .placeholder { color: var(--muted); font-size: 14px; }
   .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
@@ -141,23 +185,29 @@
 </header>
 
 <main>
+  <!-- Left column (3/4): code editor + analysis stacked. -->
   <section class="left">
-    <h2>Examples</h2>
-    <div id="examples" class="examples"></div>
-
     <h2>Code</h2>
-    <textarea id="code" spellcheck="false" placeholder="Paste Python code here, or pick an example above..."></textarea>
+    <div class="editor">
+      <pre aria-hidden="true"><code id="highlight" class="language-python"></code></pre>
+      <textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off"
+        placeholder="Paste Python code here, or pick an example on the right..."></textarea>
+    </div>
     <div class="actions">
       <button id="analyze">Analyze</button>
       <span id="status"></span>
     </div>
-  </section>
 
-  <section class="right">
-    <h2>Analysis</h2>
+    <h2 class="section-gap">Analysis</h2>
     <div id="results" class="panel">
       <div class="placeholder">No analysis yet. Choose an example and hit <strong>Analyze</strong>.</div>
     </div>
+  </section>
+
+  <!-- Right column (1/4): examples stacked in one column. -->
+  <section class="right">
+    <h2>Examples</h2>
+    <div id="examples" class="examples"></div>
   </section>
 </main>
 
@@ -250,11 +300,46 @@ print(is_valid_parentheses("{[]}"))
 
   const examplesEl = document.getElementById("examples");
   const codeEl = document.getElementById("code");
+  const highlightEl = document.getElementById("highlight");
+  const editorPre = highlightEl.parentElement;
   const analyzeBtn = document.getElementById("analyze");
   const statusEl = document.getElementById("status");
   const resultsEl = document.getElementById("results");
 
-  // Render example cards.
+  // Keep the highlighted layer in sync with the textarea contents + scroll.
+  function syncHighlight() {
+    const code = codeEl.value;
+    if (window.hljs) {
+      // Trailing newline keeps the last line aligned while scrolling.
+      highlightEl.innerHTML = hljs.highlight(code + "\n", { language: "python" }).value;
+    } else {
+      highlightEl.textContent = code + "\n";
+    }
+  }
+  function syncScroll() {
+    editorPre.scrollTop = codeEl.scrollTop;
+    editorPre.scrollLeft = codeEl.scrollLeft;
+  }
+  function setCode(code) {
+    codeEl.value = code;
+    syncHighlight();
+    syncScroll();
+  }
+
+  codeEl.addEventListener("input", syncHighlight);
+  codeEl.addEventListener("scroll", syncScroll);
+  // Insert real tab characters instead of moving focus.
+  codeEl.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const s = codeEl.selectionStart, en = codeEl.selectionEnd;
+      codeEl.value = codeEl.value.slice(0, s) + "    " + codeEl.value.slice(en);
+      codeEl.selectionStart = codeEl.selectionEnd = s + 4;
+      syncHighlight();
+    }
+  });
+
+  // Render example cards (single column).
   EXAMPLES.forEach((ex) => {
     const card = document.createElement("button");
     card.className = "example";
@@ -264,7 +349,7 @@ print(is_valid_parentheses("{[]}"))
       `<div class="title">${ex.id}. ${ex.title}</div>` +
       `<div class="level ${hard ? "hard" : ""}">${ex.level}</div>`;
     card.addEventListener("click", () => {
-      codeEl.value = ex.code;
+      setCode(ex.code);
       document.querySelectorAll(".example").forEach((c) => c.classList.remove("active"));
       card.classList.add("active");
     });
